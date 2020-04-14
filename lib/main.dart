@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' show join;
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
 
+import 'TakePictureScreen.dart';
 
 Future<void> main() async {
 
@@ -69,14 +68,17 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
 
-  List<FileSystemEntity> _files = new List<FileSystemEntity>();
+  List<String> _pictures = new List<String>();
 
   void _readinDirectory() async {
     String directory = (await getApplicationDocumentsDirectory()).path;
     setState(() {
       Directory path = Directory(join(directory, 'pictures'));
       path.create(recursive: true);
-      _files = path.listSync();  //use your folder name insted of resume.
+      _pictures.clear();
+      path.listSync().forEach( (FileSystemEntity entity) {
+        _pictures.add(entity.path);
+      });
     });
   }
 
@@ -85,7 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (BuildContext context) {
-          return TakePictureScreen();
+          return TakePictureScreen(_pictures.isEmpty ? "" : _pictures.last);
         },
       ),
     );
@@ -96,15 +98,39 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     _readinDirectory();
 
+    if (_pictures.isEmpty) {
+      return Scaffold(
+          appBar: AppBar(
+            title: Text(widget.title),
+          ),
+          body: Center(
+            child: Column(
+              children: <Widget>[
+                Spacer(),
+                Text("No images taken yet!"),
+                Text(""),
+                Text("Press PLUS button to create a first image..."),
+                Spacer(),
+              ],
+            ),
+          ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: _takePicture,
+          tooltip: 'take new picture',
+          child: Icon(Icons.add),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
       ),
       body: ListView.builder(
-        itemCount: _files.length,
+        itemCount: _pictures.length,
         itemBuilder: (BuildContext context, int index) {
-          File imgFile = File(_files[index].path);
-            String filename = path.basename(_files[index].path);
+          File imgFile = File(_pictures[index]);
+            String filename = path.basename(_pictures[index]);
             return ListTile(
                 title: Text(filename.substring(10, filename.length-4)),
                 leading: CircleAvatar(
@@ -115,7 +141,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => DisplayPictureScreen(imagePath: _files[index].path),
+                      builder: (context) => DisplayPictureScreen(images: _pictures, startIndex: index),
                     ),
                   );
                 },
@@ -126,157 +152,8 @@ class _MyHomePageState extends State<MyHomePage> {
         onPressed: _takePicture,
         tooltip: 'take new picture',
         child: Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
-    );
-  }
-}
-
-
-// A screen that allows users to take a picture using a given camera.
-class TakePictureScreen extends StatefulWidget {
-  @override
-  TakePictureScreenState createState() => TakePictureScreenState();
-}
-
-class TakePictureScreenState extends State<TakePictureScreen> {
-  CameraController _controller;
-  Future<void> _initializeControllerFuture;
-  Future<List<CameraDescription>> _availableCameras;
-
-  @override
-  void initState() {
-    super.initState();
-
-    this._availableCameras = availableCameras();
-  }
-
-  @override
-  void dispose() {
-    // Dispose of the controller when the widget is disposed.
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _initializeCameraPreview(CameraDescription camera) {
-    // To display the current output from the Camera,
-    // create a CameraController.
-    _controller = CameraController(
-      // Get a specific camera from the list of available cameras.
-      camera,
-      // Define the resolution to use.
-      ResolutionPreset.medium,
-    );
-
-    // Next, initialize the controller. This returns a Future.
-    _initializeControllerFuture = _controller.initialize();
-  }
-
-  FutureBuilder<void> _createCameraPreview() {
-    return FutureBuilder<void>(
-      future: _initializeControllerFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          // If the Future is complete, display the preview.
-          return Stack(
-              fit: StackFit.loose,
-              alignment: AlignmentDirectional.center,
-              children: <Widget>[
-                CameraPreview(_controller),
-                Opacity(
-                    opacity: 0.6,
-                    child: Image(image: AssetImage('assets/lego.png'))
-                ),
-              ]
-            );
-        } else {
-          // Otherwise, display a loading indicator.
-          return Center(child: CircularProgressIndicator());
-        }
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Take a picture')),
-      // Wait until the controller is initialized before displaying the
-      // camera preview. Use a FutureBuilder to display a loading spinner
-      // until the controller has finished initializing.
-      body: FutureBuilder<List<CameraDescription>>(
-            future: _availableCameras,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done) {
-                List<CameraDescription> cameras = snapshot.data;
-                // If the Future is complete, display the preview.
-                _initializeCameraPreview(cameras.first);
-                return _createCameraPreview();
-              } else {
-                // Otherwise, display a loading indicator.
-                return Center(child: CircularProgressIndicator());
-              }
-            },
-          ),
-      floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.camera_alt),
-        // Provide an onPressed callback.
-        onPressed: () async {
-          // Take the Picture in a try / catch block. If anything goes wrong,
-          // catch the error.
-          try {
-            // Ensure that the camera is initialized.
-            await _initializeControllerFuture;
-
-            // Construct the path where the image should be saved using the
-            // pattern package.
-            final path = join(
-              // Store the picture in the temp directory.
-              // Find the temp directory using the `path_provider` plugin.
-              (await getApplicationDocumentsDirectory()).path,
-              'pictures',
-            );
-            Directory(path).create(recursive: true);
-
-            DateTime now = DateTime.now();
-            String formattedDate = DateFormat('yyyy-MM-dd_kk:mm:ss').format(now);
-            final filepath = join(
-              path,
-              'bodystack_' + formattedDate + '.png',
-            );
-
-            // Attempt to take a picture and log where it's been saved.
-            await _controller.takePicture(filepath);
-
-            // If the picture was taken, display it on a new screen.
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DisplayPictureScreen(imagePath: filepath),
-              ),
-            );
-          } catch (e) {
-            // If an error occurs, log the error to the console.
-            print(e);
-          }
-        },
       ),
     );
   }
 }
 
-// A widget that displays the picture taken by the user.
-class DisplayPictureScreen extends StatelessWidget {
-  final String imagePath;
-
-  const DisplayPictureScreen({Key key, this.imagePath}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Display the Picture')),
-      // The image is stored as a file on the device. Use the `Image.file`
-      // constructor with the given path to display the image.
-      body: Image.file(File(imagePath)),
-    );
-  }
-}
