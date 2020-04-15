@@ -15,7 +15,8 @@ import 'package:flutter/material.dart';
 // A screen that allows users to take a picture using a given camera.
 class TakePictureScreen extends StatefulWidget {
   final String overlayPath;
-  TakePictureScreen(this.overlayPath);
+  final Directory pictureDirectory;
+  TakePictureScreen(this.pictureDirectory, this.overlayPath);
 
   @override
   TakePictureScreenState createState() => TakePictureScreenState();
@@ -26,27 +27,10 @@ class TakePictureScreenState extends State<TakePictureScreen> {
   Future<void> _initializeControllerFuture;
   Future<List<CameraDescription>> _availableCameras;
 
-  //List _subscriptions = new List();
-  //StreamSubscription<GyroscopeEvent> gyroSubscription;
-  //String _gyroText = "noch nichts passiert";
-
   @override
   void initState() {
     super.initState();
     this._availableCameras = availableCameras();
-/*
-    gyroSubscription = gyroscopeEvents.listen((GyroscopeEvent event) {
-      setState(() {
-        _gyroText = _gyroText + "." + event.toString();
-      });
-    });
-
-    _subscriptions.add(gyroscopeEvents.listen((GyroscopeEvent event) {
-      setState(() {
-        _gyroText = _gyroText + "." + event.toString();
-      });
-    }));
-*/
   }
 
   @override
@@ -178,20 +162,10 @@ class TakePictureScreenState extends State<TakePictureScreen> {
             // Ensure that the camera is initialized.
             await _initializeControllerFuture;
 
-            // Construct the path where the image should be saved using the
-            // pattern package.
-            final path = join(
-              // Store the picture in the temp directory.
-              // Find the temp directory using the `path_provider` plugin.
-              (await getApplicationDocumentsDirectory()).path,
-              'pictures',
-            );
-            Directory(path).create(recursive: true);
-
             DateTime now = DateTime.now();
             String formattedDate = DateFormat('yyyy-MM-dd_kk:mm:ss').format(now);
             final filepath = join(
-              path,
+              widget.pictureDirectory.path,
               'bodystack_' + formattedDate + '.png',
             );
 
