@@ -1,6 +1,7 @@
 
-
+import 'dart:ui';
 import 'dart:io';
+import 'dart:core';
 
 import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:intl/intl.dart';
@@ -288,22 +289,51 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
     );
   }
 
-  double picOpacity = 1.0;
+  double currentOpacity = 1.0;
+  double nextOpacity = 0.0;
+  Offset drag_start;
+  Offset drag_last;
+
 
   void _onDragStart(DragStartDetails details) {
     setState( () {
-      picOpacity = 0.7;
+      drag_start = details.globalPosition;
+      currentOpacity = 1.0;
+      nextOpacity = 0.0;
     });
   }
   void _onDragUpdate(DragUpdateDetails details) {
     setState( () {
-      picOpacity = 0.3;
+      ;
+      drag_last = details.globalPosition;
+      double diff = drag_last.dx - drag_start.dx;
+      if (diff < 0) {   // swype left -> backwards
+        nextOpacity = 0.0;
+        currentOpacity = 1.0 - (-diff / drag_start.dx);
+      }
+      else {   // swipe right -> forward
+        currentOpacity = 1.0;
+        double distance = window.physicalSize.width/2 - drag_start.dx;
+        nextOpacity = diff / distance;
+      }
     });
   }
   void _onDragEnd(DragEndDetails details) {
     setState( () {
-      picOpacity = 1.0;
-      index = index - 1;
+      currentOpacity = 1.0;
+      nextOpacity = 0.0;
+      double diff = drag_last.dx - drag_start.dx;
+      if (diff < 0) { // swype left -> backwards
+        if (index > 0 && diff.abs() > drag_start.dx/2) {
+          index = index - 1;
+        }
+      }
+      else {   // swipe right -> forward
+        double distance = window.physicalSize.width/2 - drag_start.dx;
+        if (index < widget.images.length-1 && diff > distance/2) {
+          index = index + 1;
+        }
+      }
     });
   }
 
@@ -333,10 +363,14 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
         onHorizontalDragEnd: _onDragEnd,
         child: Stack(
           children: <Widget>[
-            Image.file(File(widget.images[index-1])),
+            Image.file(File(widget.images[index == 0 ? index : index-1])),
             Opacity(
-              opacity: picOpacity,
+              opacity: currentOpacity,
               child: Image.file(File(widget.images[index])),
+            ),
+            Opacity(
+              opacity: nextOpacity,
+              child: Image.file(File(widget.images[index == widget.images.length-1 ? index : index+1])),
             ),
           ],
         ),
