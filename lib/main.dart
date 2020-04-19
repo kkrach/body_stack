@@ -69,7 +69,7 @@ class _DirectoryListState extends State<DirectoryList> {
   void _readinDirectory() {
     setState(() {
       Directory picPath = Directory(join(widget.applicationDirectory.path, 'pictures'));
-      picPath.create(recursive: true);
+      picPath.createSync(recursive: true);
       _directories.clear();
 
       picPath.listSync().forEach( (FileSystemEntity entity) {
@@ -81,10 +81,10 @@ class _DirectoryListState extends State<DirectoryList> {
   }
 
   void _createAndOpenNewStory() async {
-    setState( () async {
+    setState( () {
       TextEditingController _controller = TextEditingController();
 
-      await showDialog<String>(
+      showDialog<String>(
         context: context,
         builder: (BuildContext context) {
           return new AlertDialog(

@@ -7,10 +7,9 @@ import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:intl/intl.dart';
 import 'package:camera/camera.dart';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:sensors/sensors.dart';
 import 'package:flutter/material.dart';
-
+import 'package:permission_handler/permission_handler.dart';
 
 // A screen that allows users to take a picture using a given camera.
 class TakePictureScreen extends StatefulWidget {
@@ -49,15 +48,28 @@ class TakePictureScreenState extends State<TakePictureScreen> {
       // Get a specific camera from the list of available cameras.
       camera,
       // Define the resolution to use.
-      ResolutionPreset.medium,
+      ResolutionPreset.max,   // currently 1920x1080 :(
+      // enable audio
+      enableAudio: false,
     );
 
     // Next, initialize the controller. This returns a Future.
     _initializeControllerFuture = _controller.initialize();
   }
 
-  _previewWidget() {
-    return AspectRatio(
+  _previewWidget(BuildContext context) {
+
+    //return CameraPreview(_controller);
+
+    return RotatedBox(
+        quarterTurns: MediaQuery.of(context).orientation == Orientation.landscape ? 3 : 0,
+        child: AspectRatio(
+          aspectRatio: _controller.value.aspectRatio,
+          child: CameraPreview(_controller),
+        )
+    );
+
+        return AspectRatio(
       aspectRatio: _controller.value.aspectRatio,
       child: CameraPreview(_controller),
     );
@@ -75,7 +87,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                   fit: StackFit.loose,
                   alignment: AlignmentDirectional.center,
                   children: <Widget>[
-                    _previewWidget(),
+                    _previewWidget(context),
                     Opacity(
                       opacity: 0.4,
                       child: AspectRatio(
@@ -93,7 +105,7 @@ class TakePictureScreenState extends State<TakePictureScreen> {
                   fit: StackFit.loose,
                   alignment: AlignmentDirectional.center,
                   children: <Widget>[
-                    _previewWidget(),
+                    _previewWidget(context),
                     Opacity(
                       opacity: 0.4,
                       child: ColorFiltered(
@@ -200,6 +212,7 @@ class DisplayPictureScreen extends StatefulWidget {
   _DisplayPictureScreenState createState() => _DisplayPictureScreenState(this.startIndex);
 }
 
+
 // A widget that displays the picture taken by the user.
 class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
 
@@ -208,6 +221,33 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
   _DisplayPictureScreenState(this.index);
 
   Future<void> _askForSaveToGallery(BuildContext context, String path) async {
+    //
+    // needs the following lines into AndroidManifest.xml at profile and/or debug
+    //
+    // <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    // <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    //
+    if (! await Permission.storage.request().isGranted) {
+      return showDialog<void>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Permission Denied'),
+            content: Text('Add WriteExternalStorage permisson manually.'),
+            actions: <Widget>[
+              FlatButton(
+                child: Text('Ok'),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  openAppSettings();
+                },
+              ),
+            ],
+          );
+        },
+      );
+    }
+
     return showDialog<void>(
       context: context,
       builder: (BuildContext context) {
@@ -217,7 +257,7 @@ class _DisplayPictureScreenState extends State<DisplayPictureScreen> {
           actions: <Widget>[
             FlatButton(
               child: Text('No'),
-              onPressed: () async {
+              onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
